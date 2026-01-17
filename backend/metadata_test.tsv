@@ -1,0 +1,6 @@
+sample	disease	age	gender	treatment
+sample1	healthy	30	F	none
+sample2	diseased	45	M	drugA
+sample3	healthy	28	F	none
+sample4	diseased	50	M	drugB
+sample5	healthy	33	F	none

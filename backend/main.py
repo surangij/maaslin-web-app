@@ -1,17 +1,18 @@
+# backend/main.py
 from fastapi import FastAPI, UploadFile, File
 import subprocess
 import os
 import uuid
-import shutil
 
 app = FastAPI()
+
 
 @app.post("/run-maaslin")
 async def run_maaslin(
     features: UploadFile = File(...),
     metadata: UploadFile = File(...)
 ):
-    # Create a unique folder for this job
+    # Create a unique job folder
     job_id = str(uuid.uuid4())
     job_folder = f"/tmp/{job_id}"
     os.makedirs(job_folder, exist_ok=True)
@@ -24,11 +25,11 @@ async def run_maaslin(
     with open(metadata_path, "wb") as f:
         f.write(await metadata.read())
 
-    # Output folder
+    # Create output folder
     output_folder = os.path.join(job_folder, "output")
     os.makedirs(output_folder, exist_ok=True)
 
-    # Set simple default parameters
+    # Default MaAsLin3 parameters
     formula = "~ disease"
     normalization = "TSS"
     transform = "LOG"
@@ -40,9 +41,14 @@ async def run_maaslin(
     max_pngs = 250
     cores = 1
 
+    # R script path (relative to main.py)
+    r_script_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "250710_MaAslin3.R")
+    )
+
     # Call the R script
     r_args = [
-        "Rscript", "../250710_MaAslin3.R",
+        "Rscript", r_script_path,
         features_path,
         metadata_path,
         output_folder,
@@ -58,18 +64,17 @@ async def run_maaslin(
         str(cores)
     ]
 
-    result = subprocess.run(
-        r_args, capture_output=True, text=True
-    )
+    result = subprocess.run(r_args, capture_output=True, text=True)
 
     # Collect output files
     output_files = []
     if os.path.exists(output_folder):
         for root, dirs, files in os.walk(output_folder):
             for file in files:
-                output_files.append(file)
+                # Return relative paths for clarity
+                output_files.append(os.path.relpath(os.path.join(root, file), job_folder))
 
-    # Return R stdout, stderr, and created files
+    # Return job info
     return {
         "job_id": job_id,
         "stdout": result.stdout,
@@ -78,6 +83,8 @@ async def run_maaslin(
         "output_files": output_files
     }
 
+
 @app.get("/health")
 def health():
+    """Health check endpoint"""
     return {"status": "ok"}
